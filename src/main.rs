@@ -35,7 +35,10 @@ impl Handler for Client {
     // and returns a `Result<()>`.
     fn on_message(&mut self, msg: Message) -> Result<()> {
         // Close the connection when we get a response from the server
-        parse_instruments(msg);
+        let orderbook_request_vector = parse_instruments(msg);
+        for orderbook_request in orderbook_request_vector.iter() {
+            
+        }
         self.out.close(CloseCode::Normal)
     }
 
@@ -52,11 +55,22 @@ fn fetch_instruments() {
     }).unwrap()
 }
 
-fn parse_instruments(msg: Message) {
+fn parse_instruments(msg: Message) -> Vec<String> {
     let text_version = msg.as_text().unwrap();
-    let v: lib::InstrumentsResponse = serde_json::from_str(text_version).expect("@@@@@@@@@@@@@@@@@@@@@@@@@@");
-    println!("{:?}", v.result[0].instrumentName);
-    // for x in v["result"].iter() {
-    //     println!("{:?}", x["instrumentName"])
-    // }
+    let instrument_response: lib::InstrumentsResponse = serde_json::from_str(text_version).expect("@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    let mut request_vector = Vec::new();
+    for x in instrument_response.result.iter() {
+        request_vector.push(fetch_order_book_request(&x.instrumentName))
+    }
+    request_vector
+}
+
+fn fetch_order_book_request(instrument: &String) -> String{
+    let orderbook_request = lib::ApiRequest{
+        action: "/api/v1/public/getorderbook".to_owned(),
+        arguments: lib::ApiArguments {
+            instrument: instrument.clone()
+        }
+    };
+    serde_json::to_string(&orderbook_request).expect("Error converting request into JSON")
 }
